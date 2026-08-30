@@ -4,7 +4,7 @@ R=/opt/dinstore/bin
 RED='\033[1;31m'; BLUE='\033[1;34m'; GREEN='\033[1;32m'; CYAN='\033[1;36m'; RESET='\033[0m'
 while true; do clear
 printf '%b\n' "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
-printf '%b\n' "${RED}║                 SYSTEM INFORMATION                 ║${RESET}"
+printf '%b\n' "${RED}║                 BY DINSTORE                 ║${RESET}"
 printf '%b\n' "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
 $R/status.sh
 printf '%b\n' "${BLUE}──────────────────────────────────────────────────────${RESET}"
