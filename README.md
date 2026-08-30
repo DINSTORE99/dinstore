@@ -1,79 +1,74 @@
-# DINSTORE VPN — Unified VPS Project
+# DINSTORE VPN
 
-Satu repository untuk komponen **VIP**, **NoobzVPN**, dan data izin. File komponen yang dibutuhkan installer disimpan di repository ini sehingga installer tidak bergantung pada repository DINSTORE lain untuk file lokal.
+Unified installer untuk komponen **NoobzVPN** dan **VIP stack** dalam satu repository.
 
-## Persyaratan VPS
+## Dukungan
 
-- Debian/Ubuntu 64-bit (`x86_64`)
-- Root / sudo
-- Systemd
-- Koneksi internet
-- Untuk fitur SSL/Xray: domain milik sendiri yang sudah mengarah ke IP VPS
+- Debian 11/12/13, 64-bit x86_64
+- Ubuntu 20.04/22.04/24.04, 64-bit x86_64
+- VPS wajib menggunakan systemd dan apt
+- Jalankan sebagai `root` atau melalui `sudo`
+- Internet diperlukan untuk paket Debian/Ubuntu dan beberapa dependency upstream
 
-## Upload ke GitHub
-
-Upload **isi folder `DINSTORE-VPN`**, bukan file ZIP. Pastikan repository tidak berisi token, private key, password, atau credential cloud.
-
-## Cek project sebelum upload
+## Instalasi
 
 ```bash
-chmod +x check.sh
+git clone https://github.com/DINSTORE99/dinstore.git
+cd dinstore
+chmod +x check.sh install.sh
 ./check.sh
-```
-
-Jika hasilnya `DINSTORE-VPN repository check: OK`, struktur dan syntax script dasar sudah lolos pemeriksaan.
-
-## Install
-
-```bash
-git clone https://github.com/USERNAME/DINSTORE-VPN.git
-cd DINSTORE-VPN
-chmod +x install.sh
 sudo ./install.sh
 ```
 
-Menu installer:
+Pilih:
 
-- `1` — NoobzVPN saja
-- `2` — VIP stack
-- `3` — NoobzVPN + VIP stack
+```text
+1 = NoobzVPN
+2 = VIP stack
+3 = NoobzVPN + VIP stack
+```
 
-Installer menggunakan path relatif terhadap folder repository, jadi lokasi hasil `git clone` tidak harus `/root`.
-
-## Setelah install
+## Setelah instalasi
 
 NoobzVPN:
 
 ```bash
-systemctl status noobzvpns.service --no-pager
-journalctl -u noobzvpns.service -n 100 --no-pager
+systemctl status noobzvpns --no-pager
+journalctl -u noobzvpns -n 100 --no-pager
 ```
 
-Restart:
+VIP/Xray:
 
 ```bash
-systemctl restart noobzvpns.service
+systemctl status xray --no-pager
+systemctl status nginx --no-pager
+systemctl status haproxy --no-pager
 ```
 
-VIP biasanya meminta domain saat instalasi dan membutuhkan akses internet untuk beberapa dependency pihak ketiga (Xray, acme.sh/Let's Encrypt, geo-data, dan UDP-CUSTOM). Itu memang bagian dari installer VIP lama.
+Log installer:
 
-## Backup / credential
+```bash
+tail -n 100 /root/dinstore-vpn-install.log
+```
 
-Konfigurasi rclone di repository sengaja hanya berupa template. Jalankan `rclone config` di VPS jika ingin mengaktifkan backup cloud. Jangan commit access token atau refresh token ke GitHub.
+## Catatan domain
+
+VIP stack meminta domain saat instalasi. Domain harus sudah diarahkan ke IP VPS sebelum proses SSL dijalankan. Port 80/443 harus dapat diakses dari internet.
+
+## Catatan keamanan
+
+Jangan menyimpan token Telegram, password, private key, atau credential cloud di repository GitHub. Konfigurasi yang membutuhkan credential harus diisi setelah repository di-clone.
 
 ## Struktur
 
 ```text
 DINSTORE-VPN/
 ├── install.sh
+├── check.sh
 ├── README.md
 ├── .gitignore
-└── components/
-    ├── vip/
-    ├── noobzvpn/
-    └── izin/
+├── components/
+│   ├── noobzvpn/
+│   ├── vip/
+│   └── izin/
 ```
-
-## Catatan
-
-Installer VIP dapat mengubah konfigurasi jaringan, firewall, SSH, Nginx, HAProxy, dan service systemd VPS. Gunakan pada VPS yang memang disiapkan untuk VPN dan lakukan backup konfigurasi penting terlebih dahulu. Installer tidak lagi melakukan reboot otomatis setelah selesai.
