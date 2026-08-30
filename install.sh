@@ -1,94 +1,98 @@
 #!/usr/bin/env bash
-
 set -e
 
-BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="/opt/dinstore"
+BASE="/root/dinstore"
+OPT="/opt/dinstore"
+
+clear
 
 echo "=============================================="
-echo "        DINSTORE VPN INSTALLER"
+echo "          DINSTORE VPN INSTALLER"
 echo "=============================================="
+echo
 
-echo "[1/6] Membuat direktori..."
+echo "[1/7] Membuat directory..."
+mkdir -p "$OPT"/{api,bin,config,lib,systemd}
+mkdir -p /etc/dinstore
+mkdir -p /var/backups/dinstore
 
-mkdir -p "$INSTALL_DIR"/{bin,api,lib,config,systemd}
+echo "[2/7] Menyalin API..."
+cp -f "$BASE/api/server.py" "$OPT/api/server.py"
 
-echo "[2/6] Menyalin file installer..."
+echo "[3/7] Menyalin script..."
+cp -f "$BASE/bin/"*.sh "$OPT/bin/"
 
-# File utama
-[ -f "$BASE_DIR/install_xray.sh" ] &&
-    cp "$BASE_DIR/install_xray.sh" "$INSTALL_DIR/install_xray.sh"
+echo "[4/7] Menyalin installer..."
+cp -f "$BASE/install_xray.sh" "$OPT/install_xray.sh"
+cp -f "$BASE/install_openvpn.sh" "$OPT/install_openvpn.sh"
 
-[ -f "$BASE_DIR/install_openvpn.sh" ] &&
-    cp "$BASE_DIR/install_openvpn.sh" "$INSTALL_DIR/install_openvpn.sh"
+echo "[5/7] Menyalin library dan systemd..."
+cp -f "$BASE/lib/"*.sh "$OPT/lib/" 2>/dev/null || true
+cp -f "$BASE/systemd/"*.service "$OPT/systemd/" 2>/dev/null || true
+cp -f "$BASE/systemd/"*.timer "$OPT/systemd/" 2>/dev/null || true
 
-# Library
-[ -d "$BASE_DIR/lib" ] &&
-    cp -r "$BASE_DIR/lib/." "$INSTALL_DIR/lib/"
+echo "[6/7] Mengatur permission..."
 
-# Config
-[ -d "$BASE_DIR/config" ] &&
-    cp -r "$BASE_DIR/config/." "$INSTALL_DIR/config/"
+chmod +x "$OPT/bin/"*.sh
+chmod +x "$OPT/install_xray.sh"
+chmod +x "$OPT/install_openvpn.sh"
 
-# API
-[ -d "$BASE_DIR/api" ] &&
-    cp -r "$BASE_DIR/api/." "$INSTALL_DIR/api/"
+# Command global
+ln -sf "$OPT/bin/menu.sh" /usr/local/bin/menu
+ln -sf "$OPT/bin/status.sh" /usr/local/bin/dinstore-status
+ln -sf "$OPT/bin/backup.sh" /usr/local/bin/dinstore-backup
+ln -sf "$OPT/bin/restore.sh" /usr/local/bin/dinstore-restore
 
 # Systemd
-[ -d "$BASE_DIR/systemd" ] &&
-    cp -r "$BASE_DIR/systemd/." "$INSTALL_DIR/systemd/"
+cp -f "$BASE/systemd/dinstore-api.service" \
+    /etc/systemd/system/dinstore-api.service 2>/dev/null || true
 
-# Bin
-[ -d "$BASE_DIR/bin" ] &&
-    cp -r "$BASE_DIR/bin/." "$INSTALL_DIR/bin/"
+cp -f "$BASE/systemd/dinstore-backup.service" \
+    /etc/systemd/system/dinstore-backup.service 2>/dev/null || true
 
-echo "[3/6] Memberikan permission..."
+cp -f "$BASE/systemd/dinstore-backup.timer" \
+    /etc/systemd/system/dinstore-backup.timer 2>/dev/null || true
 
-find "$INSTALL_DIR/bin" -type f -name "*.sh" -exec chmod +x {} \;
+systemctl daemon-reload
 
-chmod +x "$INSTALL_DIR/install_xray.sh" 2>/dev/null || true
-chmod +x "$INSTALL_DIR/install_openvpn.sh" 2>/dev/null || true
+echo "[7/7] Mengaktifkan service..."
 
-echo "[4/6] Menjalankan installer Xray..."
+systemctl enable nginx 2>/dev/null || true
 
-if [ -f "$INSTALL_DIR/install_xray.sh" ]; then
-    bash "$INSTALL_DIR/install_xray.sh"
-else
-    echo "WARNING: install_xray.sh tidak ditemukan."
+if [ -f /etc/systemd/system/dinstore-api.service ]; then
+    systemctl enable --now dinstore-api.service 2>/dev/null || \
+    systemctl restart dinstore-api.service 2>/dev/null || true
 fi
 
-echo "[5/6] Menjalankan installer OpenVPN..."
-
-if [ -f "$INSTALL_DIR/install_openvpn.sh" ]; then
-    bash "$INSTALL_DIR/install_openvpn.sh"
-else
-    echo "WARNING: install_openvpn.sh tidak ditemukan."
+if [ -f /etc/systemd/system/dinstore-backup.timer ]; then
+    systemctl enable --now dinstore-backup.timer 2>/dev/null || true
 fi
 
-echo "[6/6] Mengaktifkan menu..."
-
-if [ -f "$INSTALL_DIR/bin/menu.sh" ]; then
-    chmod +x "$INSTALL_DIR/bin/menu.sh"
-    ln -sf "$INSTALL_DIR/bin/menu.sh" /usr/local/bin/menu
+# Auto menu ketika login SSH
+cat > /etc/profile.d/dinstore.sh <<'EOF'
+# DINSTORE AUTO MENU
+if [ -t 1 ] && [ -x /opt/dinstore/bin/menu.sh ]; then
+    /opt/dinstore/bin/menu.sh
 fi
+EOF
 
-hash -r 2>/dev/null || true
+chmod 644 /etc/profile.d/dinstore.sh
 
+clear
+
+echo "============================================================"
+echo "                 DINSTORE VPN INSTALLED"
+echo "============================================================"
 echo
-echo "=============================================="
-echo "          DINSTORE VPN INSTALLED"
-echo "=============================================="
+echo "  Menu   : menu"
+echo "  API    : http://127.0.0.1:8080"
+echo "  Config : /etc/dinstore"
+echo "  Backup : /var/backups/dinstore"
 echo
-echo "Menu : ketik menu"
-echo "API  : http://127.0.0.1:8080"
-echo "Config : /etc/dinstore"
-echo "Backup : /var/backups/dinstore"
-echo
-echo "=============================================="
+echo "============================================================"
+echo "              MEMBUKA DINSTORE MENU..."
+echo "============================================================"
+sleep 2
 
-if command -v menu >/dev/null 2>&1; then
-    menu
-else
-    echo "Menu belum tersedia."
-    echo "Jalankan: bash /opt/dinstore/bin/menu.sh"
-fi
+# Langsung masuk ke SC
+exec "$OPT/bin/menu.sh"
