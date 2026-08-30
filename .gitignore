@@ -1,0 +1,16 @@
+# Runtime / secrets
+*.log
+.env
+.env.*
+*.pem
+*.key
+*.crt
+/root/
+
+# Generated installer state
+.dinstore-cache/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+*.swp
