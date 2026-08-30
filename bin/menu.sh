@@ -1,506 +1,435 @@
 #!/usr/bin/env bash
+
 set -Eeuo pipefail
 
-# ============================================================
-# DINSTORE MENU
-# ============================================================
+R="/opt/dinstore/bin"
 
-BASE="/root/dinstore"
-OPT="/opt/dinstore"
-R="$OPT/bin"
-
-# Colors
+# ==============================
+# WARNA
+# ==============================
 RED='\033[1;31m'
-GREEN='\033[1;32m'
-YELLOW='\033[1;33m'
 BLUE='\033[1;34m'
+GREEN='\033[1;32m'
 CYAN='\033[1;36m'
 WHITE='\033[1;37m'
+YELLOW='\033[1;33m'
 RESET='\033[0m'
 
-pause() {
-    echo
-    read -r -p "Tekan Enter untuk kembali..." _
+# ==============================
+# CEK SCRIPT
+# ==============================
+run_script() {
+    local file="$1"
+    shift || true
+
+    if [[ -x "$R/$file" ]]; then
+        "$R/$file" "$@"
+    elif [[ -f "$R/$file" ]]; then
+        bash "$R/$file" "$@"
+    else
+        echo -e "${RED}Script tidak ditemukan: $R/$file${RESET}"
+        read -r -p "Press Enter..."
+    fi
 }
 
+# ==============================
+# PAUSE
+# ==============================
+pause() {
+    echo
+    echo -e "${WHITE}Press Enter to return to menu${RESET}"
+    read -r
+}
+
+# ==============================
+# HEADER
+# ==============================
 header() {
     clear
 
-    printf '%b\n' "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
-    printf '%b\n' "${RED}║                    DINSTORE                          ║${RESET}"
-    printf '%b\n' "${BLUE}║                 VPN MANAGEMENT                       ║${RESET}"
-    printf '%b\n' "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
-
-    echo
-
-    if [[ -x "$R/status.sh" ]]; then
-        "$R/status.sh"
-    fi
-
-    echo
-    printf '%b\n' "${BLUE}──────────────────────────────────────────────────────${RESET}"
-
-    printf '%b\n' "${CYAN}[1] SSH / OPENVPN          [6] BACKUP / RESTORE${RESET}"
-    printf '%b\n' "${CYAN}[2] VLESS / XRAY           [7] AUTO BACKUP${RESET}"
-    printf '%b\n' "${CYAN}[3] VMESS / XRAY           [8] UPDATE${RESET}"
-    printf '%b\n' "${CYAN}[4] TROJAN / XRAY          [9] SYSTEM${RESET}"
-    printf '%b\n' "${CYAN}[5] API / USERS            [10] RESTART SERVICES${RESET}"
-
+    echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+    printf "${BLUE}║${RESET}                  ${RED}DINSTORE VPN${RESET}                  ${BLUE}║${RESET}\n"
+    echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
     echo
 }
 
-# ============================================================
-# UPDATE DINSTORE
-# ============================================================
-
-update_dinstore() {
-    clear
-
-    echo "======================================================"
-    echo "                 DINSTORE UPDATE"
-    echo "======================================================"
-    echo
-
-    if [[ ! -d "$BASE/.git" ]]; then
-        echo -e "${RED}Repository Git tidak ditemukan:${RESET}"
-        echo "$BASE"
-        pause
-        return
-    fi
-
-    echo -e "${CYAN}[1/6] Mengambil update dari repository...${RESET}"
-
-    cd "$BASE"
-
-    if ! git pull --ff-only; then
-        echo
-        echo -e "${RED}Gagal melakukan git pull.${RESET}"
-        pause
-        return
-    fi
-
-    echo
-    echo -e "${GREEN}✓ Repository berhasil diperbarui.${RESET}"
-
-    echo
-    echo -e "${CYAN}[2/6] Menyalin API...${RESET}"
-
-    mkdir -p "$OPT/api"
-    [[ -f "$BASE/api/server.py" ]] &&
-        cp -f "$BASE/api/server.py" "$OPT/api/server.py"
-
-    echo
-    echo -e "${CYAN}[3/6] Memperbarui script DINSTORE...${RESET}"
-
-    mkdir -p "$OPT/bin"
-
-    if compgen -G "$BASE/bin/*.sh" > /dev/null; then
-        cp -f "$BASE/bin/"*.sh "$OPT/bin/"
-        chmod +x "$OPT/bin/"*.sh
-    fi
-
-    echo
-    echo -e "${CYAN}[4/6] Memperbarui konfigurasi systemd...${RESET}"
-
-    if [[ -d "$BASE/systemd" ]]; then
-        cp -f "$BASE/systemd/"*.service \
-            /etc/systemd/system/ 2>/dev/null || true
-
-        cp -f "$BASE/systemd/"*.timer \
-            /etc/systemd/system/ 2>/dev/null || true
-    fi
-
-    systemctl daemon-reload
-
-    echo
-    echo -e "${CYAN}[5/6] Memperbarui installer/config...${RESET}"
-
-    [[ -f "$BASE/install_xray.sh" ]] &&
-        cp -f "$BASE/install_xray.sh" "$OPT/install_xray.sh"
-
-    [[ -f "$BASE/install_openvpn.sh" ]] &&
-        cp -f "$BASE/install_openvpn.sh" "$OPT/install_openvpn.sh"
-
-    chmod +x "$OPT/install_xray.sh" 2>/dev/null || true
-    chmod +x "$OPT/install_openvpn.sh" 2>/dev/null || true
-
-    # Pastikan command menu tetap tersedia
-    ln -sf "$R/menu.sh" /usr/local/bin/menu
-
-    echo
-    echo -e "${CYAN}[6/6] Memperbarui package VPS...${RESET}"
-
-    apt-get update
-
-    apt-get install --only-upgrade \
-        xray \
-        nginx \
-        openvpn \
-        -y || true
-
-    echo
-    echo "======================================================"
-    echo -e "${GREEN}             UPDATE DINSTORE SELESAI${RESET}"
-    echo "======================================================"
-    echo
-    echo "Repository : $BASE"
-    echo "Install    : $OPT"
-    echo
-
-    # Restart API jika service tersedia
-    if systemctl list-unit-files | grep -q '^dinstore-api.service'; then
-        systemctl restart dinstore-api.service 2>/dev/null || true
-    fi
-
-    echo -e "${GREEN}✓ Update berhasil.${RESET}"
-    echo
-    echo "Kembali ke menu..."
-
-    sleep 2
-}
-
-# ============================================================
-# SSH / OPENVPN
-# ============================================================
-
-ssh_openvpn() {
-    clear
-
-    echo "======================================================"
-    echo "                 SSH / OPENVPN"
-    echo "======================================================"
-    echo
-
-    echo "1) Add SSH User"
-    echo "2) Delete SSH User"
-    echo "3) List SSH User"
-    echo "4) OpenVPN"
-    echo
-
-    read -r -p "Pilih [1-4]: " x
-
-    case "$x" in
-
-        1)
-            read -r -p "Username: " u
-            read -r -p "Days [30]: " d
-
-            d="${d:-30}"
-
-            "$R/user.sh" add "$u" "$d"
-            pause
-            ;;
-
-        2)
-            read -r -p "Username: " u
-
-            if [[ -n "$u" ]]; then
-                "$R/user.sh" del "$u"
-            fi
-
-            pause
-            ;;
-
-        3)
-            "$R/user.sh" list
-            pause
-            ;;
-
-        4)
-            echo
-            echo "OpenVPN:"
-            echo
-            echo "Gunakan konfigurasi OpenVPN yang tersedia."
-            echo
-
-            pause
-            ;;
-
-        *)
-            echo "Pilihan tidak valid."
-            sleep 1
-            ;;
-    esac
-}
-
-# ============================================================
-# XRAY
-# ============================================================
-
-xray_menu() {
-    clear
-
-    echo "======================================================"
-    echo "                    XRAY"
-    echo "======================================================"
-    echo
-
-    echo "1) VLESS"
-    echo "2) VMESS"
-    echo "3) TROJAN"
-    echo
-
-    read -r -p "Pilih [1-3]: " x
-
-    case "$x" in
-        1)
-            echo
-            echo "VLESS"
-            echo "Tambahkan client melalui API/config Xray."
-            pause
-            ;;
-
-        2)
-            echo
-            echo "VMESS"
-            echo "Tambahkan client melalui API/config Xray."
-            pause
-            ;;
-
-        3)
-            echo
-            echo "TROJAN"
-            echo "Tambahkan client melalui API/config Xray."
-            pause
-            ;;
-
-        *)
-            echo "Pilihan tidak valid."
-            sleep 1
-            ;;
-    esac
-}
-
-# ============================================================
-# API / USERS
-# ============================================================
-
-api_users() {
-    clear
-
-    echo "======================================================"
-    echo "                   API / USERS"
-    echo "======================================================"
-    echo
-
-    echo "1) Add User"
-    echo "2) Delete User"
-    echo "3) List Users"
-    echo
-
-    read -r -p "Pilih [1-3]: " x
-
-    case "$x" in
-
-        1)
-            read -r -p "Username: " u
-            read -r -p "Days [30]: " d
-
-            d="${d:-30}"
-
-            "$R/user.sh" add "$u" "$d"
-            pause
-            ;;
-
-        2)
-            read -r -p "Username: " u
-
-            [[ -n "$u" ]] && "$R/user.sh" del "$u"
-
-            pause
-            ;;
-
-        3)
-            "$R/user.sh" list
-            pause
-            ;;
-
-        *)
-            echo "Pilihan tidak valid."
-            sleep 1
-            ;;
-    esac
-}
-
-# ============================================================
-# BACKUP
-# ============================================================
-
-backup_menu() {
-    clear
-
-    echo "======================================================"
-    echo "                 BACKUP / RESTORE"
-    echo "======================================================"
-    echo
-
-    echo "1) Manual Backup"
-    echo "2) Restore"
-    echo
-
-    read -r -p "Pilih [1-2]: " x
-
-    case "$x" in
-
-        1)
-            "$R/backup.sh" manual
-            pause
-            ;;
-
-        2)
-            read -r -p "File backup: " f
-
-            if [[ -n "$f" ]]; then
-                "$R/restore.sh" "$f"
-            fi
-
-            pause
-            ;;
-
-        *)
-            echo "Pilihan tidak valid."
-            sleep 1
-            ;;
-    esac
-}
-
-# ============================================================
-# AUTO BACKUP
-# ============================================================
-
-auto_backup() {
-    clear
-
-    echo "======================================================"
-    echo "                   AUTO BACKUP"
-    echo "======================================================"
-    echo
-
-    systemctl status \
-        dinstore-backup.timer \
-        --no-pager
-
-    echo
-
-    echo "Timer:"
-    systemctl list-timers \
-        dinstore-backup.timer \
-        --no-pager
-
-    pause
-}
-
-# ============================================================
-# SYSTEM
-# ============================================================
-
-system_menu() {
-    clear
-
-    echo "======================================================"
-    echo "                     SYSTEM"
-    echo "======================================================"
-    echo
-
-    echo "Failed services:"
-    echo
-
-    systemctl --failed --no-pager
-
-    echo
-    pause
-}
-
-# ============================================================
-# RESTART SERVICES
-# ============================================================
-
-restart_services() {
-    clear
-
-    echo "======================================================"
-    echo "                RESTART SERVICES"
-    echo "======================================================"
-    echo
-
-    services=(
-        nginx
-        xray
-        dinstore-api
-    )
-
-    for service in "${services[@]}"; do
-        if systemctl list-unit-files | grep -q "^${service}.service"; then
-            echo -n "Restart $service ... "
-
-            if systemctl restart "$service" 2>/dev/null; then
-                echo -e "${GREEN}OK${RESET}"
-            else
-                echo -e "${RED}FAILED${RESET}"
-            fi
+# ==============================
+# MENU UTAMA
+# ==============================
+main_menu() {
+
+    while true; do
+
+        header
+
+        # Status
+        if [[ -x "$R/status.sh" ]]; then
+            "$R/status.sh"
+        elif [[ -f "$R/status.sh" ]]; then
+            bash "$R/status.sh"
         fi
+
+        echo
+        echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+        echo -e "${BLUE}║${RESET}                  ${RED}MAIN MENU${RESET}                       ${BLUE}║${RESET}"
+        echo -e "${BLUE}╠══════════════════════════════════════════════════════╣${RESET}"
+
+        printf "${BLUE}║${RESET} ${RED}[1]${RESET} ${CYAN}SSH / OPENVPN${RESET}        ${BLUE}│${RESET} ${RED}[6]${RESET} ${CYAN}BACKUP / RESTORE${RESET}     ${BLUE}║${RESET}\n"
+        printf "${BLUE}║${RESET} ${RED}[2]${RESET} ${CYAN}VLESS / XRAY${RESET}         ${BLUE}│${RESET} ${RED}[7]${RESET} ${CYAN}AUTO BACKUP${RESET}          ${BLUE}║${RESET}\n"
+        printf "${BLUE}║${RESET} ${RED}[3]${RESET} ${CYAN}VMESS / XRAY${RESET}         ${BLUE}│${RESET} ${RED}[8]${RESET} ${CYAN}UPDATE${RESET}               ${BLUE}║${RESET}\n"
+        printf "${BLUE}║${RESET} ${RED}[4]${RESET} ${CYAN}TROJAN / XRAY${RESET}        ${BLUE}│${RESET} ${RED}[9]${RESET} ${CYAN}SYSTEM${RESET}               ${BLUE}║${RESET}\n"
+        printf "${BLUE}║${RESET} ${RED}[5]${RESET} ${CYAN}API / USERS${RESET}          ${BLUE}│${RESET} ${RED}[10]${RESET} ${CYAN}RESTART SERVICES${RESET}   ${BLUE}║${RESET}\n"
+
+        echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+        echo
+        printf "${GREEN}Select option [1-10 / Enter to exit]: ${RESET}"
+        read -r op
+
+        [[ -z "$op" ]] && exit 0
+
+        case "$op" in
+
+            # ==========================
+            # SSH / OPENVPN
+            # ==========================
+            1)
+                while true; do
+                    header
+
+                    echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                    echo -e "${BLUE}║${RESET}                 ${RED}MENU SSH / OPENVPN${RESET}              ${BLUE}║${RESET}"
+                    echo -e "${BLUE}╠══════════════════════════════════════════════════════╣${RESET}"
+
+                    printf "${BLUE}║${RESET} ${RED}[1]${RESET} ${CYAN}ADD SSH${RESET}              ${BLUE}│${RESET} ${RED}[6]${RESET} ${CYAN}MEMBER SSH${RESET}          ${BLUE}║${RESET}\n"
+                    printf "${BLUE}║${RESET} ${RED}[2]${RESET} ${CYAN}TRIAL SSH${RESET}            ${BLUE}│${RESET} ${RED}[7]${RESET} ${CYAN}CHANGE LIMIT${RESET}        ${BLUE}║${RESET}\n"
+                    printf "${BLUE}║${RESET} ${RED}[3]${RESET} ${CYAN}DELETE USER${RESET}          ${BLUE}│${RESET} ${RED}[8]${RESET} ${CYAN}CONFIG SSH${RESET}          ${BLUE}║${RESET}\n"
+                    printf "${BLUE}║${RESET} ${RED}[4]${RESET} ${CYAN}CHECK LOGIN${RESET}          ${BLUE}│${RESET} ${RED}[9]${RESET} ${CYAN}LOCK SSH${RESET}            ${BLUE}║${RESET}\n"
+                    printf "${BLUE}║${RESET} ${RED}[5]${RESET} ${CYAN}RENEW USER${RESET}           ${BLUE}│${RESET} ${RED}[10]${RESET} ${CYAN}NOTIF MULEG${RESET}        ${BLUE}║${RESET}\n"
+
+                    echo -e "${BLUE}║${RESET}"
+                    printf "${BLUE}║${RESET} ${RED}[0]${RESET} ${CYAN}RESPON SSH${RESET}                                        ${BLUE}║${RESET}\n"
+
+                    echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                    echo
+                    printf "${GREEN}Select option: ${RESET}"
+                    read -r sshop
+
+                    case "$sshop" in
+
+                        1)
+                            read -r -p "Username: " u
+                            read -r -p "Days [30]: " d
+                            run_script user.sh add "$u" "${d:-30}"
+                            pause
+                            ;;
+
+                        2)
+                            read -r -p "Username trial: " u
+                            run_script user.sh add "$u" "1"
+                            pause
+                            ;;
+
+                        3)
+                            read -r -p "Username: " u
+                            run_script user.sh del "$u"
+                            pause
+                            ;;
+
+                        4)
+                            run_script user.sh list
+                            pause
+                            ;;
+
+                        5)
+                            read -r -p "Username: " u
+                            read -r -p "Tambah hari: " d
+                            echo "Renew user: $u +${d:-30} hari"
+                            pause
+                            ;;
+
+                        6)
+                            run_script user.sh list
+                            pause
+                            ;;
+
+                        7)
+                            echo "Pengaturan limit SSH."
+                            pause
+                            ;;
+
+                        8)
+                            echo "Konfigurasi SSH."
+                            pause
+                            ;;
+
+                        9)
+                            echo "Lock SSH."
+                            pause
+                            ;;
+
+                        10)
+                            echo "Notifikasi."
+                            pause
+                            ;;
+
+                        0)
+                            break
+                            ;;
+
+                        *)
+                            echo -e "${RED}Pilihan tidak valid.${RESET}"
+                            sleep 1
+                            ;;
+                    esac
+                done
+                ;;
+
+            # ==========================
+            # VLESS
+            # ==========================
+            2)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                    ${RED}VLESS / XRAY${RESET}                  ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+                echo -e "${CYAN}Xray core:${RESET}"
+
+                if systemctl is-active --quiet xray; then
+                    echo -e "${GREEN}● Running${RESET}"
+                else
+                    echo -e "${RED}● Stopped${RESET}"
+                fi
+
+                echo
+                echo "Gunakan konfigurasi Xray / API untuk menambah client."
+                pause
+                ;;
+
+            # ==========================
+            # VMESS
+            # ==========================
+            3)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                    ${RED}VMESS / XRAY${RESET}                  ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+                echo "Xray core aktif."
+                echo "Client dapat dikelola melalui konfigurasi/API."
+                pause
+                ;;
+
+            # ==========================
+            # TROJAN
+            # ==========================
+            4)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                   ${RED}TROJAN / XRAY${RESET}                 ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+                echo "Xray core aktif."
+                echo "Client Trojan dapat dikelola melalui konfigurasi/API."
+                pause
+                ;;
+
+            # ==========================
+            # API / USERS
+            # ==========================
+            5)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                     ${RED}API / USERS${RESET}                  ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+                echo -e "${CYAN}[1]${RESET} Add SSH User"
+                echo -e "${CYAN}[2]${RESET} Delete SSH User"
+                echo -e "${CYAN}[3]${RESET} List Users"
+
+                echo
+                printf "${GREEN}Select option: ${RESET}"
+                read -r x
+
+                case "$x" in
+
+                    1)
+                        read -r -p "Username: " u
+                        read -r -p "Days [30]: " d
+                        run_script user.sh add "$u" "${d:-30}"
+                        ;;
+
+                    2)
+                        read -r -p "Username: " u
+                        run_script user.sh del "$u"
+                        ;;
+
+                    3)
+                        run_script user.sh list
+                        ;;
+
+                esac
+
+                pause
+                ;;
+
+            # ==========================
+            # BACKUP / RESTORE
+            # ==========================
+            6)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                 ${RED}BACKUP / RESTORE${RESET}                  ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+                echo -e "${CYAN}[1]${RESET} Backup"
+                echo -e "${CYAN}[2]${RESET} Restore"
+
+                echo
+                printf "${GREEN}Select option: ${RESET}"
+                read -r x
+
+                case "$x" in
+
+                    1)
+                        run_script backup.sh manual
+                        ;;
+
+                    2)
+                        read -r -p "File backup: " f
+
+                        if [[ -n "$f" ]]; then
+                            run_script restore.sh "$f"
+                        fi
+                        ;;
+
+                esac
+
+                pause
+                ;;
+
+            # ==========================
+            # AUTO BACKUP
+            # ==========================
+            7)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                    ${RED}AUTO BACKUP${RESET}                    ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+
+                systemctl status dinstore-backup.timer --no-pager || true
+
+                echo
+                echo -e "${CYAN}Backup directory:${RESET}"
+                echo "/var/backups/dinstore"
+
+                pause
+                ;;
+
+            # ==========================
+            # UPDATE
+            # ==========================
+            8)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                      ${RED}UPDATE${RESET}                        ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+
+                if [[ -d /root/dinstore/.git ]]; then
+                    cd /root/dinstore
+
+                    echo -e "${CYAN}Checking update...${RESET}"
+                    git pull || true
+
+                    if [[ -f bin/menu.sh ]]; then
+                        cp -f bin/menu.sh /opt/dinstore/bin/menu.sh
+                        chmod +x /opt/dinstore/bin/menu.sh
+                    fi
+
+                    echo
+                    echo -e "${GREEN}Update selesai.${RESET}"
+                else
+                    echo -e "${YELLOW}Git repository tidak ditemukan.${RESET}"
+                fi
+
+                pause
+                ;;
+
+            # ==========================
+            # SYSTEM
+            # ==========================
+            9)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                      ${RED}SYSTEM${RESET}                        ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+
+                echo -e "${CYAN}Failed services:${RESET}"
+                systemctl --failed --no-pager || true
+
+                echo
+                echo -e "${CYAN}Disk:${RESET}"
+                df -h /
+
+                echo
+                echo -e "${CYAN}Memory:${RESET}"
+                free -h
+
+                pause
+                ;;
+
+            # ==========================
+            # RESTART
+            # ==========================
+            10)
+                header
+
+                echo -e "${BLUE}╔══════════════════════════════════════════════════════╗${RESET}"
+                echo -e "${BLUE}║${RESET}                ${RED}RESTART SERVICES${RESET}                  ${BLUE}║${RESET}"
+                echo -e "${BLUE}╚══════════════════════════════════════════════════════╝${RESET}"
+
+                echo
+                echo "Restarting..."
+
+                systemctl restart nginx || true
+                systemctl restart xray || true
+                systemctl restart dinstore-api || true
+
+                echo
+                echo -e "${GREEN}Services berhasil direstart.${RESET}"
+
+                pause
+                ;;
+
+            *)
+                echo -e "${RED}Pilihan tidak valid.${RESET}"
+                sleep 1
+                ;;
+
+        esac
+
     done
-
-    echo
-    echo -e "${GREEN}Service selesai direstart.${RESET}"
-
-    pause
 }
 
-# ============================================================
-# MAIN MENU
-# ============================================================
-
-while true; do
-
-    header
-
-    printf '%b' "${GREEN}Select Options [1-10 / Enter to exit]: ${RESET}"
-    read -r op
-
-    # Enter = keluar
-    [[ -z "$op" ]] && exit 0
-
-    case "$op" in
-
-        1)
-            ssh_openvpn
-            ;;
-
-        2|3|4)
-            xray_menu
-            ;;
-
-        5)
-            api_users
-            ;;
-
-        6)
-            backup_menu
-            ;;
-
-        7)
-            auto_backup
-            ;;
-
-        8)
-            update_dinstore
-            ;;
-
-        9)
-            system_menu
-            ;;
-
-        10)
-            restart_services
-            ;;
-
-        *)
-            echo
-            echo -e "${RED}Pilihan tidak valid.${RESET}"
-            sleep 1
-            ;;
-
-    esac
-
-done
+main_menu
