@@ -1,16 +1,11 @@
-# Runtime / secrets
+/etc/
+*.key
+*.pem
+*.crt
+*.db
 *.log
 .env
-.env.*
-*.pem
-*.key
-*.crt
-/root/
-
-# Generated installer state
-.dinstore-cache/
-
-# OS/editor
-.DS_Store
-Thumbs.db
-*.swp
+config.env
+users.json
+backups/
+__pycache__/
