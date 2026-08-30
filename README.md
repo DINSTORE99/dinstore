@@ -1,16 +1,8 @@
-# DINSTORE VPN
+# DINSTORE VPN — rebuilt from zero
 
-Unified installer untuk komponen **NoobzVPN** dan **VIP stack** dalam satu repository.
+Installer/menu/API/backup dalam satu repository. Target: Ubuntu 20.04+ dan Debian 11+ x86_64 dengan systemd.
 
-## Dukungan
-
-- Debian 11/12/13, 64-bit x86_64
-- Ubuntu 20.04/22.04/24.04, 64-bit x86_64
-- VPS wajib menggunakan systemd dan apt
-- Jalankan sebagai `root` atau melalui `sudo`
-- Internet diperlukan untuk paket Debian/Ubuntu dan beberapa dependency upstream
-
-## Instalasi
+## Install
 
 ```bash
 git clone https://github.com/DINSTORE99/dinstore.git
@@ -20,55 +12,50 @@ chmod +x check.sh install.sh
 sudo ./install.sh
 ```
 
-Pilih:
-
-```text
-1 = NoobzVPN
-2 = VIP stack
-3 = NoobzVPN + VIP stack
-```
-
-## Setelah instalasi
-
-NoobzVPN:
+Setelah install:
 
 ```bash
-systemctl status noobzvpns --no-pager
-journalctl -u noobzvpns -n 100 --no-pager
+menu
+systemctl status dinstore-api
+systemctl status dinstore-backup.timer
 ```
 
-VIP/Xray:
+## API
+
+API bind ke `127.0.0.1:8080` secara default. Isi `API_KEY` di `/etc/dinstore/config.env`, restart service, lalu gunakan header `X-API-Key`.
+
+Endpoint:
+
+- `GET /health`
+- `GET /api/v1/status`
+- `GET /api/v1/users`
+- `POST /api/v1/users`
+- `GET /api/v1/backups`
+- `POST /api/v1/backup`
+- `POST /api/v1/backup/config`
+
+API sengaja tidak diekspos ke internet secara default. Untuk website/bot, letakkan reverse proxy HTTPS + autentikasi tambahan di depan API.
+
+## Backup
+
+Backup manual:
 
 ```bash
-systemctl status xray --no-pager
-systemctl status nginx --no-pager
-systemctl status haproxy --no-pager
+/opt/dinstore/bin/backup.sh manual
 ```
 
-Log installer:
+Restore:
 
 ```bash
-tail -n 100 /root/dinstore-vpn-install.log
+/opt/dinstore/bin/restore.sh /var/backups/dinstore/dinstore-YYYYMMDD-HHMMSS.tar.gz
 ```
 
-## Catatan domain
+Auto backup dijalankan oleh `dinstore-backup.timer` setiap hari pukul 03:30 dengan retention default 7 file. Ubah `BACKUP_TIME` di config lalu buat override systemd jika ingin jadwal berbeda.
 
-VIP stack meminta domain saat instalasi. Domain harus sudah diarahkan ke IP VPS sebelum proses SSL dijalankan. Port 80/443 harus dapat diakses dari internet.
+## VPN
 
-## Catatan keamanan
+- Xray core: VLESS/VMess/Trojan dapat dikembangkan lewat config/API.
+- OpenVPN: paket dan server base disiapkan; jalankan `make-openvpn-pki` untuk membuat PKI milik server.
+- Nginx: dipasang sebagai reverse proxy layer.
 
-Jangan menyimpan token Telegram, password, private key, atau credential cloud di repository GitHub. Konfigurasi yang membutuhkan credential harus diisi setelah repository di-clone.
-
-## Struktur
-
-```text
-DINSTORE-VPN/
-├── install.sh
-├── check.sh
-├── README.md
-├── .gitignore
-├── components/
-│   ├── noobzvpn/
-│   ├── vip/
-│   └── izin/
-```
+Jangan commit private key, API key, sertifikat, atau database user ke GitHub.
