@@ -79,7 +79,7 @@ clear
 # ==============================
 # DINSTORE IP LICENSE
 # ==============================
-LICENSE_URL="https://raw.githubusercontent.com/DINSTORE99/dinstore/main/license/licenses.txt"
+LICENSE_URL="https://github.com/DINSTORE99/dinstore/blob/main/license/licenses.txt"
 LICENSE_FILE="/etc/dinstore-license"
 MYIP=$(curl -4 -fsS --max-time 10 https://api.ipify.org || true)
 
