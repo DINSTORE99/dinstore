@@ -79,14 +79,14 @@ clear
 # ==============================
 # DINSTORE IP LICENSE
 # ==============================
-LICENSE_URL="https://github.com/DINSTORE99/dinstore/blob/main/license/licenses.txt"
+LICENSE_URL="https://github.com/DINSTORE99/dinstore/main/license/licenses.txt"
 LICENSE_FILE="/etc/dinstore-license"
 MYIP=$(curl -4 -fsS --max-time 10 https://api.ipify.org || true)
 
 check_license() {
     clear
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${FONT}"
-    echo -e "${Green}           DINSTORE IP LICENSE${FONT}"
+    echo -e "${Green}           DINSTORE IP ${FONT}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${FONT}"
     echo
     echo -e "IP VPS : ${green}${MYIP:-Tidak terdeteksi}${NC}"
