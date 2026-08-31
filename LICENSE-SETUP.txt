@@ -1,0 +1,8 @@
+DINSTORE GITHUB REBUILD
+
+1. Upload seluruh isi folder ke repository DINSTORE99/dinstore.
+2. Pastikan file license/licenses.txt ada di branch main.
+3. Tambahkan IP pelanggan dengan format IP|YYYY-MM-DD|LABEL.
+4. Jalankan setup.sh di VPS. Setup akan menolak IP yang tidak terdaftar atau expired.
+5. Setelah install selesai, setup tidak meminta reboot dan mencoba membuka menu.
+6. Login SSH berikutnya menjalankan menu melalui /root/.profile.
