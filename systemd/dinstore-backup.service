@@ -1,5 +1,0 @@
-[Unit]
-Description=DINSTORE automatic backup
-[Service]
-Type=oneshot
-ExecStart=/opt/dinstore/bin/backup.sh auto
